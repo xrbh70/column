@@ -193,7 +193,7 @@ then
                                    print ""}')
     quitar=1                                                                                                   #Se activa esta bandera para que si esta presente la opcion -print
 else                                                                                                           #solamente aparezca el -print de la segunda ejecucion del  comando cols.awk
-    cat /tmp/$$column$$ |sed -e 's/^  //'  -e 's/^ //'
+    cat /tmp/$$column$$ |sed -e 's/^ //'
 fi
 if [ $l -eq 1 ]
 then
