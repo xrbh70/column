@@ -128,9 +128,8 @@ awk -v final="$a" \
                            #---------------------------------------------------------------------------------
     NR<final && NR>records {for(a=1;a<=NF;a++) {split($a, g, ".")
                                                 if   (length(g[2])>h[a])    h[a]=length(g[2])      #h[a] Tamaño de la parte fraccionaria de la columna
-                                                if   (length(g[1])>j[a])    j[a]=length(g[1])}}    #j[a] Tamaño de la parte entera de la columna
-                           #---------------------------------------------------------------------------------
-    NR<final && NR>records {for(a=1;a<=NF;a++) {if   (is_string($a)==1)     {c[a]="-"              #c[a] Alineacion izquierda/texto (-) derecha/numeros ("")
+                                                if   (length(g[1])>j[a])    j[a]=length(g[1])      #j[a] Tamaño de la parte entera de la columna
+                                                if   (is_string($a)==1)     {c[a]="-"              #c[a] Alineacion izquierda/texto (-) derecha/numeros ("")
                                                                              e[a]="s"              #e[a] Si es texto (s) o flotante(f) o entero (d)
                                                                              d[a]=1}               #d[a] Inmutabilidad para columna texto
                                                                                                    #No es texto, evaluar si es flotante o entero
@@ -141,10 +140,10 @@ awk -v final="$a" \
                                                 else if(d[a]!=1 && f[a]!=1) {c[a]=""               #c[a] Alineacion izquierda/texto (-) derecha/numeros ("")
                                                                              e[a]="d"}}}           #e[a] Si es texto (s) o flotante(f) o entero (d)
     #--------------------------------------------------------------------------------------------------------
-    END {q="\047"                                                                             #comilla simple
-         for(a in b) i[a]=b[a]                                                                #Pasar los valores del array b en i, para poder modificar los de i, ya que los de b se vuelven de lectura al llegar a END
-         for(a in b) if(i[a]<h[a]+j[a]+1 && e[a]=="f") i[a]=h[a]+j[a]+1                       #Si la columna es flotante y es mas grande que la columna texto del analisis entonces tomar el nuevo valor de tamaño de columna
-         for(a in b) if(redond!="" && e[a]=="f")       if(redond>=h[a]) i[a]=i[a]-h[a]+redond #Ajustar el tamaño de columna por el cambio de cifras decimales
+    END {q="\047"                                                                               #comilla simple
+         for(a in b) {i[a]=b[a]                                                                 #Pasar los valores del array b en i, para poder modificar los de i, ya que los de b se vuelven de lectura al llegar a END
+                      if(i[a]<h[a]+j[a]+1 && e[a]=="f") i[a]=h[a]+j[a]+1                        #Si la columna es flotante y es mas grande que la columna texto del analisis entonces tomar el nuevo valor de tamaño de columna
+                      if(redond!="" && e[a]=="f")       if(redond>=h[a]) i[a]=i[a]-h[a]+redond} #Ajustar el tamaño de columna por el cambio de cifras decimales
 
          #Creacion del reporte en base al analisis del awk
          printf("awk    %sNR==%s       {printf(%s", q, 1, "\"")                                                                       #1
@@ -193,7 +192,7 @@ then
                                    print ""}')
     quitar=1                                                                                                   #Se activa esta bandera para que si esta presente la opcion -print
 else                                                                                                           #solamente aparezca el -print de la segunda ejecucion del  comando cols.awk
-    cat /tmp/$$column$$ |sed -e 's/^ //'
+    cat /tmp/$$column$$ |sed -e 's/^  //'  -e 's/^ //'
 fi
 if [ $l -eq 1 ]
 then
