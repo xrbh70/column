@@ -1,13 +1,45 @@
 #!/bin/bash
 #==============================================================================
 # cols - Formateador avanzado de columnas con análisis automático de tipos
-# Versión: 2.0
+# Versión: 2.1 - Compatible macOS/Linux
 # Autor: Xavier
 # Última modificación: 2026-01-13
-# Dependencias: awk, sed, bash 4.0+
+# Dependencias: gawk (GNU awk), sed, bash 4.0+
 #==============================================================================
 
 set -euo pipefail
+
+#==============================================================================
+# SECCIÓN: Detección de awk apropiado
+#==============================================================================
+detect_awk() {
+    if command -v gawk >/dev/null 2>&1; then
+        echo "gawk"
+    elif command -v awk >/dev/null 2>&1; then
+        if awk --version 2>/dev/null | grep -qi "GNU Awk"; then
+            echo "awk"
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
+}
+
+AWK_CMD=$(detect_awk) || {
+    echo "Error: Se requiere GNU awk (gawk)" >&2
+    echo >&2
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "En macOS instala con:" >&2
+        echo "  brew install gawk" >&2
+    else
+        echo "En Linux instala con:" >&2
+        echo "  sudo apt-get install gawk    # Debian/Ubuntu" >&2
+        echo "  sudo yum install gawk        # RedHat/CentOS" >&2
+    fi
+    echo >&2
+    exit 1
+}
 
 #==============================================================================
 # SECCIÓN: Limpieza y trap
@@ -51,6 +83,9 @@ debug_log() {
     fi
 }
 
+debug_log "Sistema: $OSTYPE"
+debug_log "Usando: $AWK_CMD"
+
 #==============================================================================
 # SECCIÓN: Análisis de parámetros
 #==============================================================================
@@ -71,7 +106,7 @@ do
            debug_log "Opción: omitir pie"
            ;;
        "--redond"|"-r")
-           redond=$(echo "$*" |awk '{for(a=1;a<=NF;a++) if($a=="--redond" || $a=="-r") if($(a+1) ~ /^[0-9]+$/) {print $(a+1);break}}')
+           redond=$(echo "$*" | $AWK_CMD '{for(a=1;a<=NF;a++) if($a=="--redond" || $a=="-r") if($(a+1) ~ /^[0-9]+$/) {print $(a+1);break}}')
            case "$redond" in
                 "2" ) val=1;;
                 ""  ) redond=2
@@ -81,7 +116,7 @@ do
            esac
            ;;
        "--trunc"|"-t")
-           trunc=$(echo "$*" |awk '{for(a=1;a<=NF;a++)  if($a=="--trunc" || $a=="-t")  if($(a+1) ~ /^[0-9]+$/) {print $(a+1);break}}')
+           trunc=$(echo "$*" | $AWK_CMD '{for(a=1;a<=NF;a++)  if($a=="--trunc" || $a=="-t")  if($(a+1) ~ /^[0-9]+$/) {print $(a+1);break}}')
            case "$trunc" in
                 "80" ) val=1;;
                 ""   ) trunc=80
@@ -108,7 +143,7 @@ do
            debug_log "Opción: sin espacios dobles"
            ;;
        "--delimit"|"-d")
-           d=$(echo "$*" |awk '{for(a=1;a<=NF;a++)  if($a=="--delimit" || $a=="-d")  if($(a+1) ~ /^[[:punct:]]$/) {print $(a+1);break}}')
+           d=$(echo "$*" | $AWK_CMD '{for(a=1;a<=NF;a++)  if($a=="--delimit" || $a=="-d")  if($(a+1) ~ /^[[:punct:]]$/) {print $(a+1);break}}')
            case "$d" in
                 ""   ) d=" ";;
                 *    ) debug_log "Delimitador: '$d'"
@@ -133,6 +168,7 @@ DESCRIPCIÓN
     - Ancho óptimo de columnas
 
     Sustituye al comando 'column' de Linux con funcionalidades avanzadas.
+    Compatible con Linux y macOS (requiere GNU awk/gawk).
 
 OPCIONES
     -c, --comand         Muestra el comando awk generado para el formato
@@ -158,6 +194,16 @@ EJEMPLOS
 
     # Ver el comando awk generado
     cols datos.txt -e -p -r 2 -c
+
+INSTALACIÓN
+    macOS:
+        brew install gawk
+
+    Linux (Debian/Ubuntu):
+        sudo apt-get install gawk
+
+    Linux (RedHat/CentOS):
+        sudo yum install gawk
 
 VARIABLES DE ENTORNO
     COLS_DEBUG=1         Activa mensajes de debug
@@ -227,7 +273,7 @@ debug_log "Datos recibidos: $(wc -l < "$TMPFILE") líneas"
 # SECCIÓN: Truncar la salida al número de caracteres indicado
 #==============================================================================
 if [ $trunc -ne 0 ]; then
-    awk -v trunc=$trunc '{print substr($0,1,trunc)}' "$TMPFILE" > "${TMPFILE}_1"
+    $AWK_CMD -v trunc=$trunc '{print substr($0,1,trunc)}' "$TMPFILE" > "${TMPFILE}_1"
     mv "${TMPFILE}_1" "$TMPFILE"
     debug_log "Truncado aplicado a $trunc caracteres"
 fi
@@ -236,14 +282,21 @@ fi
 # SECCIÓN: Cambiar el delimitador por espacio
 #==============================================================================
 if [ $del -eq 1 ]; then
-    sed -i 's/'"$d"'/ /g' "$TMPFILE"
+    # Compatible con macOS y Linux
+    if sed --version 2>/dev/null | grep -q GNU; then
+        # GNU sed (Linux)
+        sed -i 's/'"$d"'/ /g' "$TMPFILE"
+    else
+        # BSD sed (macOS)
+        sed -i '' 's/'"$d"'/ /g' "$TMPFILE"
+    fi
     debug_log "Delimitador '$d' reemplazado por espacio"
 fi
 
 #==============================================================================
 # SECCIÓN: Determinar número de líneas y columnas del reporte
 #==============================================================================
-a=$(awk 'NR==1{a=NF}END{print NR, NF, a}' "$TMPFILE")
+a=$($AWK_CMD 'NR==1{a=NF}END{print NR, NF, a}' "$TMPFILE")
 debug_log "Análisis: $a (líneas columnas_última columnas_primera)"
 
 #==============================================================================
@@ -263,11 +316,12 @@ fi
 #==============================================================================
 debug_log "Generando comando awk formateador..."
 
-awk -v final="$a" \
+$AWK_CMD -v final="$a" \
     -v redond=$redond \
     -v encab=$encab \
     -v pie=$pie \
-    -v s="$s" '
+    -v s="$s" \
+    -v awkcmd="$AWK_CMD" '
     #==========================================================================
     # Funciones auxiliares para detección de tipos de datos
     #==========================================================================
@@ -360,7 +414,7 @@ awk -v final="$a" \
         #======================================================================
         # Generar formato para la PRIMERA LÍNEA (encabezado)
         #======================================================================
-        printf("awk    %sNR==%s       {printf(%s", q, 1, "\"")
+        printf("%s    %sNR==%s       {printf(%s", awkcmd, q, 1, "\"")
 
         if(encab == 1) {
             # Si se omite análisis del encabezado, formatear como texto
@@ -459,7 +513,7 @@ mv "${TMPFILE}_1" "$TMPFILE"
 #==============================================================================
 if [ $l -eq 1 ]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS - echo no soporta -e por defecto
+        # macOS - usar printf
         printf "\033[4;49;39m"
     else
         # Linux - echo con -e funciona
@@ -476,7 +530,7 @@ if [ "$redond" != "" ]; then
 
     cat "$TMPFILE" |
     sed -e 's/^  //' -e 's/^ //' -e 's/|/ /g' |
-    cols.awk $(echo "$*" |awk '{for(a=1;a<=NF;a++)
+    cols.awk $(echo "$*" | $AWK_CMD '{for(a=1;a<=NF;a++)
                                    if($a=="--redond" || $a=="-r") if   ($(a+1) ~ /^[0-9]+$/) {$(a+1)=""
                                                                                               continue}
                                                                   else                       continue
