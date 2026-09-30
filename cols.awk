@@ -255,10 +255,10 @@ if tty >/dev/null 2>&1; then
         echo "Use: cols -h para ayuda" >&2
         exit 1
     fi
-    cat -v "$param1" > "$TMPFILE"
+    sed $'s/\e\\[[0-9;]*m//g' "$param1" | cat -v > "$TMPFILE"
 else
     # Entrada desde pipe
-    cat -v > "$TMPFILE"
+    sed $'s/\e\\[[0-9;]*m//g' | cat -v > "$TMPFILE"
 fi
 
 # Validar que hay datos
